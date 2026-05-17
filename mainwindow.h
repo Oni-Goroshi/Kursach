@@ -20,8 +20,6 @@
 #include <QStringList>
 #include <QVector>
 #include <QByteArray>
-
-// OpenSSL
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
@@ -29,9 +27,6 @@
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
-// ================================================================
-//  RSA-2048 через OpenSSL (EVP API — актуальный интерфейс OpenSSL 3.x)
-//
 //  Схема работы:
 //    1. Из мастер-пароля через SHA-256 получаем 32-байтовый seed.
 //    2. Seed подаётся в детерминированный PRNG (RAND_seed),
@@ -42,27 +37,19 @@
 //       пароль шифруется целиком как одна строка UTF-8:
 //       пароли длиннее 190 байт на практике не встречаются.
 //    5. Шифртекст сохраняется в Base64 для хранения в текстовом файле.
-//
-//  Безопасность:
-//    - Ключ 2048 бит — текущий промышленный стандарт.
-//    - OAEP-паддинг с SHA-256.
-//    - Настоящий CSPRNG OpenSSL.
-//    - Ключи НЕ сохраняются на диск: генерируются заново из
-//      мастер-пароля при каждом запуске (детерминированно).
-// ================================================================
 class RSACipher {
 public:
-    // Пара ключей (владеющий указатель на EVP_PKEY)
+    //пара ключей (владеющий указатель на EVP_PKEY)
     struct Keys {
         EVP_PKEY *pkey = nullptr;
 
         Keys() = default;
 
-        // Запрещаем копирование — OpenSSL ресурс
+        //запрещаем копирование — OpenSSL ресурс
         Keys(const Keys &) = delete;
         Keys &operator=(const Keys &) = delete;
 
-        // Разрешаем перемещение
+        //разрешаем перемещение
         Keys(Keys &&o) noexcept : pkey(o.pkey) { o.pkey = nullptr; }
         Keys &operator=(Keys &&o) noexcept {
             if (this != &o) {
@@ -77,13 +64,10 @@ public:
 
         bool valid() const { return pkey != nullptr; }
     };
-
-    // ----------------------------------------------------------------
     // Генерация ключей RSA-2048 из мастер-пароля
     //
     // Алгоритм детерминирован: SHA-256(мастер-пароль) → seed → PRNG →
     // → RSA-2048 keygen. Одинаковый пароль всегда даёт одинаковые ключи.
-    // ----------------------------------------------------------------
     static Keys generateKeys(const QString &masterPassword) {
         // 1. SHA-256 от мастер-пароля → 32-байтовый seed
         QByteArray pwd = masterPassword.toUtf8();
@@ -112,10 +96,7 @@ public:
         EVP_PKEY_CTX_free(ctx);
         return keys;
     }
-
-    // ----------------------------------------------------------------
     // Шифрование строки: UTF-8 → RSA-OAEP → Base64
-    // ----------------------------------------------------------------
     static QString encrypt(const QString &text, const Keys &keys) {
         QByteArray plain = text.toUtf8();
 
@@ -156,10 +137,7 @@ public:
         // Возвращаем Base64 (без переносов строк — для хранения в одну строку файла)
         return QString::fromLatin1(cipher.toBase64(QByteArray::Base64Encoding));
     }
-
-    // ----------------------------------------------------------------
     // Дешифрование: Base64 → RSA-OAEP → UTF-8
-    // ----------------------------------------------------------------
     static QString decrypt(const QString &cipherB64, const Keys &keys) {
         QByteArray cipher = QByteArray::fromBase64(cipherB64.toLatin1());
 
@@ -200,12 +178,10 @@ public:
     }
 };
 
-// ================================================================
 struct PasswordEntry {
     QString service, login, password, note;
 };
 
-// ================================================================
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
